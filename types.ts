@@ -55,3 +55,12 @@ export interface HoroscopeData {
   };
   sources?: HoroscopeSource[];
 }
+
+// Added missing GmailEmail interface to resolve module export error in GmailWidget.tsx
+export interface GmailEmail {
+  id: string;
+  sender: string;
+  subject: string;
+  time: string;
+  isRead: boolean;
+}
