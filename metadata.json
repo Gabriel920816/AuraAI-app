@@ -1,0 +1,7 @@
+{
+  "name": "Aura: AI-Powered Personal Calendar & Life Assistant",
+  "description": "A sophisticated, multi-functional calendar application designed for cross-device harmony. Features include a smart to-do list, focus timer, localized weather, AI-generated daily horoscopes, a simulated Gmail inbox assistant, a comprehensive period tracker, and a personal AI companion to manage Australian and international holidays.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
