@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateHoroscope, getZodiacSign } from '../geminiService';
 import { HoroscopeData } from '../types';
@@ -71,12 +72,22 @@ const GlassSelect = ({ value, options, onChange, label }: { value: number, optio
 };
 
 const GlassTripleDropdown = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
-  const [y, m, d] = value ? value.split('-').map(Number) : [2000, 1, 1];
+  // Fix: Ensure robust parsing of the YYYY-MM-DD string
+  const parts = value ? value.split('-') : [];
+  const y = parts[0] ? parseInt(parts[0]) : 2000;
+  const m = parts[1] ? parseInt(parts[1]) : 1;
+  const d = parts[2] ? parseInt(parts[2]) : 1;
+  
   const years = Array.from({ length: 100 }, (_, i) => 2024 - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const daysInMonth = new Date(y, m, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  const update = (ny = y, nm = m, nd = d) => { onChange(`${ny}-${String(nm).padStart(2, '0')}:${String(nd).padStart(2, '0')}`); };
+  
+  // Fix: The previous implementation had a colon separator ':' in the padStart string, causing split('-') to fail and return NaN.
+  const update = (ny = y, nm = m, nd = d) => { 
+    onChange(`${ny}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`); 
+  };
+
   return (
     <div className="flex gap-2 w-full">
       <GlassSelect value={y} options={years} onChange={(val) => update(val, m, d)} label="Year" />
@@ -96,7 +107,7 @@ interface HeaderWidgetsProps {
 
 const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth, setBgImage, weatherData, onSetLocation }) => {
   const [horoscope, setHoroscope] = useState<HoroscopeData | null>(null);
-  const [birthDate, setBirthDate] = useState<string>(localStorage.getItem('aura_birthdate') || '');
+  const [birthDate, setBirthDate] = useState<string>(localStorage.getItem('aura_birthdate') || '2000-01-01');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showBgPicker, setShowBgPicker] = useState(false);
@@ -177,19 +188,14 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
 
   return (
     <header className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 overflow-visible relative z-[500] h-14">
-      {/* Left Section - Unified Brand Identifier, shifted left slightly as requested */}
       <div className="flex items-center gap-8 shrink-0 w-full lg:w-auto overflow-visible ml-0 lg:ml-10 transition-all duration-1000 ease-in-out">
         <div className="flex items-center select-none group cursor-default">
-          {/* Internal spacing unit: 0.2em */}
           <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95 leading-none translate-y-[1px]">A</span>
-          
-          {/* Orb container: uses mr-[0.2em] to match the tracking distance of the letters */}
           <div className="relative w-[1.7rem] h-[1.7rem] thick-glass-orb rounded-full shrink-0 mr-[0.2em] overflow-visible">
             <div className="w-[6px] h-[6px] bg-white rounded-full animate-aura-core z-20"></div>
             <div className="w-[6px] h-[6px] bg-white rounded-full animate-aura-halo z-10"></div>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-[200%] h-full animate-orb-sheen pointer-events-none z-30 rounded-full"></div>
           </div>
-          
           <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95 leading-none translate-y-[1px]">RA</span>
         </div>
 

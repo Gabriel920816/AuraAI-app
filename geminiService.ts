@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 const getAIClient = () => {
@@ -62,7 +63,8 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
   try {
     const response = await fetchWithRetry(async () => {
       const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        // Switched to flash-preview for broader availability and speed
+        model: 'gemini-3-flash-preview',
         contents: `Today is ${today}. 
         Act as a professional mathematical astrologer.
         1. Search for current real-time planetary positions and aspects affecting ${sign} today.
@@ -132,8 +134,9 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
   try {
     return await fetchWithRetry(async () => {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `You are Aura AI. Context: ${JSON.stringify(currentContext)}. User asked: "${query}". Respond in JSON.`,
+        // Switched to flash-preview for better performance and fewer connection timeouts
+        model: 'gemini-3-flash-preview',
+        contents: `You are Aura AI, a helpful life assistant. Context: ${JSON.stringify(currentContext)}. User asked: "${query}". Respond in JSON.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -156,6 +159,7 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
       return JSON.parse(response.text || '{}');
     });
   } catch (error) {
-    throw new Error("API Limit Reached");
+    console.error("Assistant API Error:", error);
+    throw new Error("API Limit Reached or Connection Issue");
   }
 };
