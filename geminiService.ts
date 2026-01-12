@@ -5,25 +5,24 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
-// Simple string-to-integer hash for deterministic seeding
 const generateSeed = (str: string): number => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash);
 };
 
-const fetchWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1500) => {
+const fetchWithRetry = async (fn: () => Promise<any>, retries = 2, delay = 1000) => {
   try {
     return await fn();
   } catch (error: any) {
     const isRetryable = error?.status === 429 || error?.status >= 500 || error?.message?.includes('quota');
     if (retries > 0 && isRetryable) {
       await new Promise(r => setTimeout(r, delay));
-      return fetchWithRetry(fn, retries - 1, delay * 2);
+      return fetchWithRetry(fn, retries - 1, delay * 1.5);
     }
     throw error;
   }
@@ -52,10 +51,7 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
   const today = new Date().toISOString().split('T')[0];
   const cacheKey = `aura_horoscope_v6_consistent_${sign}_${today}`;
   const cached = localStorage.getItem(cacheKey);
-  
-  if (cached && !forceRefresh) {
-    return JSON.parse(cached);
-  }
+  if (cached && !forceRefresh) return JSON.parse(cached);
 
   const ai = getAIClient();
   const seed = generateSeed(`${sign}-${today}`);
@@ -63,38 +59,23 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
   try {
     const response = await fetchWithRetry(async () => {
       const res = await ai.models.generateContent({
-        // Switched to flash-preview for broader availability and speed
         model: 'gemini-3-flash-preview',
-        contents: `Today is ${today}. 
-        Act as a professional mathematical astrologer.
-        1. Search for current real-time planetary positions and aspects affecting ${sign} today.
-        2. Strictly CALCULATE the ratings (1-5) based on current celestial intensity.
-        3. The 'summary' field MUST be exactly one word (a noun or adjective) representing the theme of the day (e.g., 'Prosperity', 'Reflection', 'Dynamic', 'Balance').
-        
-        Provide the response in JSON format. Ensure the prediction is grounded in the search data.`,
+        contents: `Today is ${today}. Act as a professional mathematical astrologer. Provide the response in JSON format.`,
         config: {
           tools: [{ googleSearch: {} }],
-          temperature: 0.0,
+          temperature: 0.1,
           seed: seed,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              summary: { 
-                type: Type.STRING, 
-                description: "A single word summarizing the day's theme (e.g., 'Clarity', 'Hustle', 'Peace')." 
-              },
+              summary: { type: Type.STRING },
               prediction: { type: Type.STRING },
               luckyNumber: { type: Type.STRING },
               luckyColor: { type: Type.STRING },
               ratings: {
                 type: Type.OBJECT,
-                properties: {
-                  love: { type: Type.NUMBER },
-                  work: { type: Type.NUMBER },
-                  health: { type: Type.NUMBER },
-                  wealth: { type: Type.NUMBER }
-                },
+                properties: { love: { type: Type.NUMBER }, work: { type: Type.NUMBER }, health: { type: Type.NUMBER }, wealth: { type: Type.NUMBER } },
                 required: ["love", "work", "health", "wealth"]
               }
             },
@@ -102,42 +83,46 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
           }
         }
       });
-      
       const jsonContent = JSON.parse(res.text || '{}');
-      
       const chunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const sources = chunks
-        .map(c => c.web)
-        .filter((w): w is { title: string; uri: string } => !!(w && w.title && w.uri))
-        .map(w => ({ title: w.title, uri: w.uri }));
-
+      const sources = chunks.map(c => c.web).filter(w => !!(w && w.title && w.uri)).map(w => ({ title: w!.title, uri: w!.uri }));
       return { ...jsonContent, sources };
     });
-
     localStorage.setItem(cacheKey, JSON.stringify(response));
     return response;
   } catch (error) {
-    console.warn("Horoscope API failed, using fallback.");
-    return { 
-      summary: "Mystery",
-      prediction: "The stars are currently aligning in a complex geometric pattern that resists simple interpretation. Trust your intuition today.", 
-      luckyNumber: "7", 
-      luckyColor: "Deep Indigo",
-      ratings: { love: 3, work: 3, health: 3, wealth: 3 },
-      sources: []
-    };
+    return { summary: "Mystery", prediction: "The stars are complex today.", luckyNumber: "7", luckyColor: "Indigo", ratings: { love: 3, work: 3, health: 3, wealth: 3 }, sources: [] };
   }
 };
 
 export const processAssistantQuery = async (query: string, currentContext: any) => {
   const ai = getAIClient();
+  const today = new Date();
+  const dateContext = {
+    today_iso: today.toISOString().split('T')[0],
+    today_full: today.toString(),
+    day_of_week: today.toLocaleDateString('en-US', { weekday: 'long' })
+  };
+
   try {
     return await fetchWithRetry(async () => {
       const response = await ai.models.generateContent({
-        // Switched to flash-preview for better performance and fewer connection timeouts
         model: 'gemini-3-flash-preview',
-        contents: `You are Aura AI, a helpful life assistant. Context: ${JSON.stringify(currentContext)}. User asked: "${query}". Respond in JSON.`,
+        contents: `You are Aura AI, a helpful life assistant. 
+        CURRENT TIME: ${JSON.stringify(dateContext)}.
+        LOCAL WEATHER: ${JSON.stringify(currentContext.currentWeather || {})}.
+        USER DATA: ${JSON.stringify(currentContext)}.
+        
+        QUERY: "${query}"
+        
+        INSTRUCTIONS:
+        1. If user asks about weather, use the LOCAL WEATHER context. If they ask about other locations or forecasts, use the googleSearch tool.
+        2. For dates like "tomorrow", use CURRENT TIME to calculate exact YYYY-MM-DD.
+        3. Return ONLY JSON.`,
         config: {
+          tools: [{ googleSearch: {} }],
+          thinkingConfig: { thinkingBudget: 2000 },
+          temperature: 0.1,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -147,7 +132,16 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
                 type: Type.OBJECT,
                 properties: {
                   type: { type: Type.STRING, enum: ["ADD_EVENT", "CHANGE_COUNTRY", "NONE"] },
-                  data: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, date: { type: Type.STRING }, startTime: { type: Type.STRING }, endTime: { type: Type.STRING }, country: { type: Type.STRING } } }
+                  data: { 
+                    type: Type.OBJECT, 
+                    properties: { 
+                      title: { type: Type.STRING }, 
+                      date: { type: Type.STRING }, 
+                      startTime: { type: Type.STRING }, 
+                      endTime: { type: Type.STRING }, 
+                      country: { type: Type.STRING } 
+                    } 
+                  }
                 },
                 required: ["type"]
               }
@@ -156,10 +150,9 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
           }
         }
       });
-      return JSON.parse(response.text || '{}');
+      return JSON.parse(response.text || '{"reply": "I understood.", "action": {"type": "NONE"}}');
     });
   } catch (error) {
-    console.error("Assistant API Error:", error);
-    throw new Error("API Limit Reached or Connection Issue");
+    throw new Error("Connection Timeout");
   }
 };

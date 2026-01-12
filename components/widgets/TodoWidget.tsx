@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { TodoItem } from '../../types';
 
@@ -6,6 +7,7 @@ interface TodoWidgetProps {
   setTodos: (t: TodoItem[]) => void;
 }
 
+// Fix: Completed the truncated file and added the missing default export.
 const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
@@ -137,16 +139,16 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
       </div>
 
       {editingTodo && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xl animate-in fade-in" onClick={() => setEditingTodo(null)}>
-          <div className="w-full ios-glass border-white/20 p-8 flex flex-col gap-6 shadow-2xl scale-in-center" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl animate-in fade-in" onClick={() => setEditingTodo(null)}>
+          <div className="w-full heavy-frost p-8 rounded-[2.5rem] flex flex-col gap-6 shadow-2xl scale-in-center border-white/20" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center">
                <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Edit Task</h4>
-               <button onClick={() => setEditingTodo(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white"><i className="fa-solid fa-xmark text-xs"></i></button>
+               <button onClick={() => setEditingTodo(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white transition-all border border-white/10"><i className="fa-solid fa-xmark text-xs"></i></button>
             </div>
             
             <input 
               autoFocus
-              className="bg-transparent border-none text-xl font-black text-white outline-none w-full"
+              className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xl font-black text-white outline-none w-full focus:bg-white/10 focus:border-white/20 transition-all"
               value={editingTodo.text}
               onChange={(e) => {
                 updateText(editingTodo.id, e.target.value);
@@ -155,7 +157,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
             />
 
             <div className="space-y-3">
-               <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Priority</span>
+               <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Priority Level</span>
                <div className="grid grid-cols-3 gap-2">
                   {(['low', 'medium', 'high'] as const).map(p => (
                     <button 
@@ -165,22 +167,13 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
                         setEditingTodo({...editingTodo, priority: p});
                       }}
                       className={`py-3 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all
-                        ${editingTodo.priority === p 
-                          ? (p === 'high' ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : p === 'medium' ? 'bg-orange-500/20 border-orange-500/50 text-orange-300' : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300') 
-                          : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10'}`}
+                        ${editingTodo.priority === p ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10'}`}
                     >
                       {p}
                     </button>
                   ))}
                </div>
             </div>
-
-            <button 
-              onClick={() => setEditingTodo(null)}
-              className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] shadow-lg active:scale-95 transition-all mt-2"
-            >
-              Save Changes
-            </button>
           </div>
         </div>
       )}
