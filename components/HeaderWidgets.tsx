@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { generateHoroscope, getZodiacSign } from '../geminiService';
 import { HoroscopeData } from '../types';
 import FocusWidget from './widgets/FocusWidget';
 import WeatherIcon from './WeatherIcon';
@@ -71,7 +71,6 @@ const GlassSelect = ({ value, options, onChange, label }: { value: number, optio
 };
 
 const GlassTripleDropdown = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
-  // Fix: Ensure robust parsing of the YYYY-MM-DD string
   const parts = value ? value.split('-') : [];
   const y = parts[0] ? parseInt(parts[0]) : 2000;
   const m = parts[1] ? parseInt(parts[1]) : 1;
@@ -82,7 +81,6 @@ const GlassTripleDropdown = ({ value, onChange }: { value: string, onChange: (va
   const daysInMonth = new Date(y, m, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   
-  // Fix: The previous implementation had a colon separator ':' in the padStart string, causing split('-') to fail and return NaN.
   const update = (ny = y, nm = m, nd = d) => { 
     onChange(`${ny}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`); 
   };
@@ -102,10 +100,14 @@ interface HeaderWidgetsProps {
   setBgImage: (url: string) => void;
   weatherData?: { temp: number, code: number, condition: string, location: string };
   onSetLocation: (lat: number, lon: number, name: string) => void;
+  horoscope: HoroscopeData | null;
+  onRefreshHoroscope: (date: string, force?: boolean) => void;
 }
 
-const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth, setBgImage, weatherData, onSetLocation }) => {
-  const [horoscope, setHoroscope] = useState<HoroscopeData | null>(null);
+const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ 
+  showHealth, setShowHealth, setBgImage, weatherData, onSetLocation,
+  horoscope, onRefreshHoroscope 
+}) => {
   const [birthDate, setBirthDate] = useState<string>(localStorage.getItem('aura_birthdate') || '2000-01-01');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,23 +126,6 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => { document.removeEventListener('mousedown', handleClickOutside); };
-  }, []);
-
-  const fetchHoroscope = async (date: string, force = false) => {
-    if (!date) return;
-    setIsSyncing(true);
-    const sign = getZodiacSign(date);
-    try {
-      const data = await generateHoroscope(sign, date, force);
-      setHoroscope({ ...data, sign });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  useEffect(() => { 
-    const storedDate = localStorage.getItem('aura_birthdate');
-    if (storedDate) fetchHoroscope(storedDate);
   }, []);
 
   useEffect(() => {
@@ -184,6 +169,12 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
     { name: 'Cosmic Nebula', url: 'https://images.pexels.com/photos/2150/sky-space-dark-galaxy.jpg?auto=compress&cs=tinysrgb&w=2560' },
     { name: 'Stormy Ocean', url: 'https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=2560' }
   ];
+
+  const handleFetchHoroscope = async (date: string, force = false) => {
+    setIsSyncing(true);
+    await onRefreshHoroscope(date, force);
+    setIsSyncing(false);
+  };
 
   return (
     <header className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 overflow-visible relative z-[500] h-14">
@@ -309,7 +300,7 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
                   <p className="text-[11px] text-white/40 leading-relaxed max-w-[240px] mx-auto">Select your birthday to get your horoscope for today.</p>
                 </div>
                 <div className="w-full"><GlassTripleDropdown value={birthDate} onChange={setBirthDate} /></div>
-                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); fetchHoroscope(birthDate); } }} className="w-full py-4 ios-glass hover:bg-white/10 active:scale-95 transition-all text-white flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.4em]">
+                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); handleFetchHoroscope(birthDate); } }} className="w-full py-4 ios-glass hover:bg-white/10 active:scale-95 transition-all text-white flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.4em]">
                   {isSyncing ? <><div className="w-3 h-3 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div><span>Loading...</span></> : "Show Horoscope"}
                 </button>
               </div>
@@ -344,7 +335,7 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
                 <div className="pt-4 border-t border-white/10 flex flex-col gap-5">
                    <div className="flex justify-between items-center px-1">
                       <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Birthday Settings</span>
-                      <button disabled={isSyncing} onClick={() => fetchHoroscope(birthDate, true)} className="text-indigo-400 text-[9px] font-black uppercase hover:text-white transition-all flex items-center gap-2">
+                      <button disabled={isSyncing} onClick={() => handleFetchHoroscope(birthDate, true)} className="text-indigo-400 text-[9px] font-black uppercase hover:text-white transition-all flex items-center gap-2">
                         {isSyncing && <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin"></div>}Refresh
                       </button>
                    </div>

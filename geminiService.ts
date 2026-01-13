@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 const getAIClient = () => {
@@ -15,7 +16,6 @@ const generateSeed = (str: string): number => {
 };
 
 const cleanJSONResponse = (text: string): string => {
-  // Remove markdown code blocks if present
   return text.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
 };
 
@@ -62,8 +62,9 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
 
   try {
     const response = await fetchWithRetry(async () => {
+      // 降级为 gemini-3-flash-preview 以获得更多配额
       const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro for better reasoning and grounding
+        model: 'gemini-3-flash-preview', 
         contents: `Today is ${today}. Act as a professional astrologer. Research the daily horoscope for ${sign} and return ONLY a valid JSON object. 
         IMPORTANT: The 'summary' field MUST be a SINGLE word representing the daily theme (e.g., 'Focus', 'Radiant', 'Shift', 'Calm'). 
         DO NOT include markdown tags or explanation.`,
@@ -98,7 +99,6 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
       const cleanedText = cleanJSONResponse(res.text || '{}');
       const jsonContent = JSON.parse(cleanedText);
       
-      // Safety check: ensure summary is indeed a single word
       if (jsonContent.summary && jsonContent.summary.includes(' ')) {
         jsonContent.summary = jsonContent.summary.split(' ')[0];
       }
@@ -114,7 +114,7 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
     console.error("Horoscope Generation Error:", error);
     return { 
       summary: "Mystery", 
-      prediction: "The stars are obscured by clouds today. Try refreshing later.", 
+      prediction: "The stars are obscured by clouds. Gemini API limits reached. Try refreshing tomorrow.", 
       luckyNumber: "??", 
       luckyColor: "Silver", 
       ratings: { love: 3, work: 3, health: 3, wealth: 3 }, 

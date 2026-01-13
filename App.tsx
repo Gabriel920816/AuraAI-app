@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarEvent, TodoItem, PeriodRecord } from './types';
+import { CalendarEvent, TodoItem, PeriodRecord, HoroscopeData } from './types';
 import Dashboard from './components/Dashboard';
 import AssistantBubble from './components/AssistantBubble';
 import HeaderWidgets from './components/HeaderWidgets';
 import WeatherBackground from './components/WeatherBackground';
+import { generateHoroscope, getZodiacSign } from './geminiService';
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -15,6 +17,7 @@ const App: React.FC = () => {
   
   const [todayKey, setTodayKey] = useState<string>(new Date().toDateString());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [horoscope, setHoroscope] = useState<HoroscopeData | null>(null);
 
   const [weather, setWeather] = useState<{temp: number, code: number, condition: string, location: string}>({ 
     temp: 24, 
@@ -35,13 +38,12 @@ const App: React.FC = () => {
     let hasChanges = false;
     
     const updatedTodos = currentTodos.map(todo => {
-      // If task is not completed and its date is in the past
       if (!todo.completed && todo.date < todayStr) {
         hasChanges = true;
         return { 
           ...todo, 
           date: todayStr, 
-          originalDate: todo.originalDate || todo.date // Keep track of where it came from
+          originalDate: todo.originalDate || todo.date 
         };
       }
       return todo;
@@ -81,6 +83,14 @@ const App: React.FC = () => {
     }
   };
 
+  // 全局加载星座数据的方法
+  const loadHoroscope = useCallback(async (birthDate: string, force = false) => {
+    if (!birthDate) return;
+    const sign = getZodiacSign(birthDate);
+    const data = await generateHoroscope(sign, birthDate, force);
+    setHoroscope({ ...data, sign });
+  }, []);
+
   useEffect(() => {
     const savedEvents = localStorage.getItem('aura_events');
     if (savedEvents) setEvents(JSON.parse(savedEvents));
@@ -88,7 +98,6 @@ const App: React.FC = () => {
     const savedTodos = localStorage.getItem('aura_todos');
     if (savedTodos) {
       const parsedTodos = JSON.parse(savedTodos);
-      // Run rollover on initial load
       rolloverTasks(parsedTodos);
     }
     
@@ -101,6 +110,12 @@ const App: React.FC = () => {
     const savedBg = localStorage.getItem('aura_bg');
     if (savedBg) setBgImage(savedBg);
 
+    // 初始加载星座
+    const savedBirthdate = localStorage.getItem('aura_birthdate');
+    if (savedBirthdate) {
+      loadHoroscope(savedBirthdate);
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => updateWeather(pos.coords.latitude, pos.coords.longitude, 'Nearby'),
       () => updateWeather(-33.8688, 151.2093, 'Sydney')
@@ -110,7 +125,6 @@ const App: React.FC = () => {
       const current = new Date().toDateString();
       if (todayKey !== current) {
         setTodayKey(current);
-        // Refresh rollover on date change
         setTodos(prev => {
           rolloverTasks(prev);
           return prev;
@@ -118,7 +132,7 @@ const App: React.FC = () => {
       }
     }, 60000);
     return () => clearInterval(midnightCheck);
-  }, [rolloverTasks, todayKey]);
+  }, [rolloverTasks, todayKey, loadHoroscope]);
 
   useEffect(() => {
     const weatherInterval = setInterval(() => {
@@ -147,6 +161,7 @@ const App: React.FC = () => {
         <HeaderWidgets 
           showHealth={showHealth} setShowHealth={setShowHealth} setBgImage={setBgImage}
           weatherData={weather} onSetLocation={updateWeather}
+          horoscope={horoscope} onRefreshHoroscope={loadHoroscope}
         />
         <main className="min-h-0 flex-1">
           <Dashboard 

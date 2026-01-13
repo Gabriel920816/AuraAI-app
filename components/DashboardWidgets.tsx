@@ -1,32 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
-import { generateHoroscope, getZodiacSign } from '../geminiService';
+import React from 'react';
 import { HoroscopeData } from '../types';
 
-const DashboardWidgets: React.FC = () => {
-  const [horoscope, setHoroscope] = useState<HoroscopeData | null>(null);
-  const birthDate = localStorage.getItem('aura_birthdate');
+interface DashboardWidgetsProps {
+  horoscope: HoroscopeData | null;
+}
 
-  useEffect(() => {
-    if (birthDate) {
-      const sign = getZodiacSign(birthDate);
-      generateHoroscope(sign, birthDate).then(data => {
-        setHoroscope({ sign, ...data });
-      }).catch(err => {
-        console.error("Dashboard Horoscope error", err);
-      });
-    }
-  }, [birthDate]);
-
+const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({ horoscope }) => {
   return (
     <div className="flex items-center gap-2 md:gap-4">
-      {/* Weather Info (Simplified) */}
       <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-sky-50/10 text-sky-200 rounded-full text-xs font-bold border border-white/10">
         <i className="fa-solid fa-cloud-sun text-[10px]"></i>
         <span>Live</span>
       </div>
 
-      {/* Horoscope Badge */}
       <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-amber-50/10 text-amber-200 rounded-full text-xs font-bold border border-white/10 cursor-help group relative">
         <i className="fa-solid fa-moon text-[10px]"></i>
         <span>{horoscope ? horoscope.summary : 'Sync Vibe'}</span>
