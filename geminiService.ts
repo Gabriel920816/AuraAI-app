@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 const getAIClient = () => {
@@ -13,6 +12,11 @@ const generateSeed = (str: string): number => {
     hash = hash & hash;
   }
   return Math.abs(hash);
+};
+
+const cleanJSONResponse = (text: string): string => {
+  // Remove markdown code blocks if present
+  return text.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
 };
 
 const fetchWithRetry = async (fn: () => Promise<any>, retries = 2, delay = 1000) => {
@@ -49,7 +53,7 @@ export const getZodiacSign = (date: string) => {
 
 export const generateHoroscope = async (sign: string, birthDate: string, forceRefresh = false) => {
   const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `aura_horoscope_v6_consistent_${sign}_${today}`;
+  const cacheKey = `aura_horoscope_v7_${sign}_${today}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached && !forceRefresh) return JSON.parse(cached);
 
@@ -59,23 +63,30 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
   try {
     const response = await fetchWithRetry(async () => {
       const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Today is ${today}. Act as a professional mathematical astrologer. Provide the response in JSON format.`,
+        model: 'gemini-3-pro-preview', // Upgraded to Pro for better reasoning and grounding
+        contents: `Today is ${today}. Act as a professional astrologer. Research the daily horoscope for ${sign} and return ONLY a valid JSON object. 
+        IMPORTANT: The 'summary' field MUST be a SINGLE word representing the daily theme (e.g., 'Focus', 'Radiant', 'Shift', 'Calm'). 
+        DO NOT include markdown tags or explanation.`,
         config: {
           tools: [{ googleSearch: {} }],
-          temperature: 0.1,
+          temperature: 0.2,
           seed: seed,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              summary: { type: Type.STRING },
-              prediction: { type: Type.STRING },
+              summary: { type: Type.STRING, description: "A SINGLE power-word daily mood/theme" },
+              prediction: { type: Type.STRING, description: "Full daily prediction text" },
               luckyNumber: { type: Type.STRING },
               luckyColor: { type: Type.STRING },
               ratings: {
                 type: Type.OBJECT,
-                properties: { love: { type: Type.NUMBER }, work: { type: Type.NUMBER }, health: { type: Type.NUMBER }, wealth: { type: Type.NUMBER } },
+                properties: { 
+                  love: { type: Type.NUMBER }, 
+                  work: { type: Type.NUMBER }, 
+                  health: { type: Type.NUMBER }, 
+                  wealth: { type: Type.NUMBER } 
+                },
                 required: ["love", "work", "health", "wealth"]
               }
             },
@@ -83,15 +94,32 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
           }
         }
       });
-      const jsonContent = JSON.parse(res.text || '{}');
+      
+      const cleanedText = cleanJSONResponse(res.text || '{}');
+      const jsonContent = JSON.parse(cleanedText);
+      
+      // Safety check: ensure summary is indeed a single word
+      if (jsonContent.summary && jsonContent.summary.includes(' ')) {
+        jsonContent.summary = jsonContent.summary.split(' ')[0];
+      }
+
       const chunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const sources = chunks.map(c => c.web).filter(w => !!(w && w.title && w.uri)).map(w => ({ title: w!.title, uri: w!.uri }));
       return { ...jsonContent, sources };
     });
+    
     localStorage.setItem(cacheKey, JSON.stringify(response));
     return response;
   } catch (error) {
-    return { summary: "Mystery", prediction: "The stars are complex today.", luckyNumber: "7", luckyColor: "Indigo", ratings: { love: 3, work: 3, health: 3, wealth: 3 }, sources: [] };
+    console.error("Horoscope Generation Error:", error);
+    return { 
+      summary: "Mystery", 
+      prediction: "The stars are obscured by clouds today. Try refreshing later.", 
+      luckyNumber: "??", 
+      luckyColor: "Silver", 
+      ratings: { love: 3, work: 3, health: 3, wealth: 3 }, 
+      sources: [] 
+    };
   }
 };
 
@@ -150,7 +178,7 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
           }
         }
       });
-      return JSON.parse(response.text || '{"reply": "I understood.", "action": {"type": "NONE"}}');
+      return JSON.parse(cleanJSONResponse(response.text || '{"reply": "I understood.", "action": {"type": "NONE"}}'));
     });
   } catch (error) {
     throw new Error("Connection Timeout");

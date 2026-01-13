@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarEvent, TodoItem, PeriodRecord } from './types';
 import Dashboard from './components/Dashboard';
 import AssistantBubble from './components/AssistantBubble';
@@ -15,6 +14,7 @@ const App: React.FC = () => {
   const [bgImage, setBgImage] = useState<string>('https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=2560');
   
   const [todayKey, setTodayKey] = useState<string>(new Date().toDateString());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const [weather, setWeather] = useState<{temp: number, code: number, condition: string, location: string}>({ 
     temp: 24, 
@@ -24,6 +24,33 @@ const App: React.FC = () => {
   });
 
   const [lastCoords, setLastCoords] = useState<{lat: number, lon: number, name: string} | null>(null);
+
+  const getTodayStr = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  const rolloverTasks = useCallback((currentTodos: TodoItem[]) => {
+    const todayStr = getTodayStr();
+    let hasChanges = false;
+    
+    const updatedTodos = currentTodos.map(todo => {
+      // If task is not completed and its date is in the past
+      if (!todo.completed && todo.date < todayStr) {
+        hasChanges = true;
+        return { 
+          ...todo, 
+          date: todayStr, 
+          originalDate: todo.originalDate || todo.date // Keep track of where it came from
+        };
+      }
+      return todo;
+    });
+
+    if (hasChanges) {
+      setTodos(updatedTodos);
+    }
+  }, []);
 
   const updateWeather = async (lat: number, lon: number, locationName: string, retries = 3) => {
     if (isNaN(lat) || isNaN(lon)) return;
@@ -57,8 +84,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedEvents = localStorage.getItem('aura_events');
     if (savedEvents) setEvents(JSON.parse(savedEvents));
+    
     const savedTodos = localStorage.getItem('aura_todos');
-    if (savedTodos) setTodos(JSON.parse(savedTodos));
+    if (savedTodos) {
+      const parsedTodos = JSON.parse(savedTodos);
+      // Run rollover on initial load
+      rolloverTasks(parsedTodos);
+    }
+    
     const savedPeriods = localStorage.getItem('aura_periods');
     if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
     const savedHealthPref = localStorage.getItem('aura_show_health');
@@ -75,10 +108,17 @@ const App: React.FC = () => {
 
     const midnightCheck = setInterval(() => {
       const current = new Date().toDateString();
-      setTodayKey(prev => prev !== current ? current : prev);
+      if (todayKey !== current) {
+        setTodayKey(current);
+        // Refresh rollover on date change
+        setTodos(prev => {
+          rolloverTasks(prev);
+          return prev;
+        });
+      }
     }, 60000);
     return () => clearInterval(midnightCheck);
-  }, []);
+  }, [rolloverTasks, todayKey]);
 
   useEffect(() => {
     const weatherInterval = setInterval(() => {
@@ -110,9 +150,12 @@ const App: React.FC = () => {
         />
         <main className="min-h-0 flex-1">
           <Dashboard 
-            events={events} setEvents={setEvents} todos={todos} setTodos={setTodos} 
-            periods={periods} setPeriods={setPeriods} showHealth={showHealth}
+            events={events} setEvents={setEvents} 
+            todos={todos} setTodos={setTodos} 
+            periods={periods} setPeriods={setPeriods} 
+            showHealth={showHealth}
             selectedCountry={selectedCountry} setSelectedCountry={setSelectedCountry}
+            selectedDate={selectedDate} setSelectedDate={setSelectedDate}
           />
         </main>
         <AssistantBubble 

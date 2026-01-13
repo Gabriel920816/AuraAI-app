@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateHoroscope, getZodiacSign } from '../geminiService';
 import { HoroscopeData } from '../types';
@@ -310,7 +309,7 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({ showHealth, setShowHealth
                   <p className="text-[11px] text-white/40 leading-relaxed max-w-[240px] mx-auto">Select your birthday to get your horoscope for today.</p>
                 </div>
                 <div className="w-full"><GlassTripleDropdown value={birthDate} onChange={setBirthDate} /></div>
-                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); fetchHoroscope(birthDate); } }} className="w-full py-4 bg-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.4em] shadow-xl hover:brightness-110 active:scale-95 transition-all text-white flex items-center justify-center gap-3">
+                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); fetchHoroscope(birthDate); } }} className="w-full py-4 ios-glass hover:bg-white/10 active:scale-95 transition-all text-white flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.4em]">
                   {isSyncing ? <><div className="w-3 h-3 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div><span>Loading...</span></> : "Show Horoscope"}
                 </button>
               </div>

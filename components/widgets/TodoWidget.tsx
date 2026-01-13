@@ -1,23 +1,26 @@
-
 import React, { useState, useMemo } from 'react';
 import { TodoItem } from '../../types';
 
 interface TodoWidgetProps {
   todos: TodoItem[];
   setTodos: (t: TodoItem[]) => void;
+  selectedDate: Date;
 }
 
-// Fix: Completed the truncated file and added the missing default export.
-const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
+const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos, selectedDate }) => {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
 
+  const selectedDateStr = useMemo(() => {
+    return `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  }, [selectedDate]);
+
   const stats = useMemo(() => ({
-    all: todos.length,
-    active: todos.filter(t => !t.completed).length,
-    completed: todos.filter(t => t.completed).length
-  }), [todos]);
+    all: todos.filter(t => t.date === selectedDateStr).length,
+    active: todos.filter(t => t.date === selectedDateStr && !t.completed).length,
+    completed: todos.filter(t => t.date === selectedDateStr && t.completed).length
+  }), [todos, selectedDateStr]);
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +29,8 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
       id: Date.now().toString(), 
       text: input, 
       completed: false, 
-      priority: 'medium' 
+      priority: 'medium',
+      date: selectedDateStr
     }, ...todos]);
     setInput('');
   };
@@ -50,6 +54,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
   };
 
   const filteredTodos = todos.filter(t => {
+    if (t.date !== selectedDateStr) return false;
     if (activeTab === 'active') return !t.completed;
     if (activeTab === 'completed') return t.completed;
     return true;
@@ -66,7 +71,10 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
   return (
     <div className="ios-glass p-0 h-full flex flex-col min-h-0 overflow-hidden relative">
       <div className="px-6 py-4 border-b border-white/10 shrink-0 flex justify-between items-center">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Task List</h3>
+        <div className="flex flex-col">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Tasks</h3>
+          <span className="text-[8px] font-black opacity-30 mt-0.5">{selectedDateStr === new Date().toISOString().split('T')[0] ? 'TODAY' : selectedDateStr}</span>
+        </div>
         <span className="text-[10px] font-black digital-number opacity-30">{stats.active} ACTIVE</span>
       </div>
 
@@ -97,9 +105,16 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
           >
              <div className="flex items-center min-w-0 flex-1">
                 <PriorityIcon level={todo.priority} />
-                <span className={`text-sm font-semibold tracking-tight transition-all truncate text-white ${todo.completed ? 'line-through opacity-50' : ''}`}>
-                  {todo.text}
-                </span>
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-sm font-semibold tracking-tight transition-all truncate text-white ${todo.completed ? 'line-through opacity-50' : ''}`}>
+                    {todo.text}
+                  </span>
+                  {todo.originalDate && !todo.completed && (
+                    <span className="text-[7px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                      <i className="fa-solid fa-clock-rotate-left"></i> Rolled over
+                    </span>
+                  )}
+                </div>
              </div>
 
              <div className="flex items-center gap-2 shrink-0">
@@ -121,7 +136,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
         )) : (
           <div className="py-12 flex flex-col items-center justify-center opacity-20">
               <i className="fa-solid fa-layer-group text-3xl mb-3"></i>
-              <p className="text-[9px] font-black uppercase tracking-[0.4em]">List is empty</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.4em]">No tasks for this day</p>
           </div>
         )}
       </div>
@@ -132,7 +147,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos }) => {
             type="text" 
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Add a new task..."
+            placeholder="Add task to this date..."
             className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs outline-none focus:bg-white/10 focus:border-white/30 transition-all placeholder:opacity-30 text-white font-bold"
           />
         </form>

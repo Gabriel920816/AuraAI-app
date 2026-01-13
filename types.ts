@@ -1,4 +1,3 @@
-
 export enum ViewType {
   CALENDAR = 'CALENDAR',
   TASKS = 'TASKS',
@@ -10,7 +9,7 @@ export enum ViewType {
 export interface CalendarEvent {
   id: string;
   title: string;
-  date: string; // ISO String
+  date: string; // YYYY-MM-DD
   startTime: string;
   endTime: string;
   description?: string;
@@ -22,6 +21,8 @@ export interface TodoItem {
   text: string;
   completed: boolean;
   priority: 'low' | 'medium' | 'high';
+  date: string; // YYYY-MM-DD
+  originalDate?: string; // To track if it was rolled over
 }
 
 export interface PeriodRecord {
@@ -56,7 +57,6 @@ export interface HoroscopeData {
   sources?: HoroscopeSource[];
 }
 
-// Added missing GmailEmail interface to resolve module export error in GmailWidget.tsx
 export interface GmailEmail {
   id: string;
   sender: string;

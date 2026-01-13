@@ -9,9 +9,15 @@ const InfoRow: React.FC = () => {
   useEffect(() => {
     if (birthDate) {
       const sign = getZodiacSign(birthDate);
-      const cached = localStorage.getItem(`aura_horoscope_${sign}`);
+      const today = new Date().toISOString().split('T')[0];
+      const cacheKey = `aura_horoscope_v7_${sign}_${today}`;
+      const cached = localStorage.getItem(cacheKey);
+      
       if (cached) {
-        setHoroscope(JSON.parse(cached).data);
+        setHoroscope(JSON.parse(cached));
+      } else {
+        // Fallback fetch if not in cache (HeaderWidgets usually populates this)
+        generateHoroscope(sign, birthDate).then(setHoroscope).catch(() => {});
       }
     }
   }, [birthDate]);
@@ -35,7 +41,7 @@ const InfoRow: React.FC = () => {
             <i className="fa-solid fa-moon text-lg text-amber-400"></i>
         </div>
         <div>
-          <p className="text-lg font-black leading-none tracking-tighter">{horoscope?.summary || 'Stable'}</p>
+          <p className="text-lg font-black leading-none tracking-tighter truncate max-w-[80px]">{horoscope?.summary || 'Stable'}</p>
           <p className="text-[9px] opacity-40 uppercase font-black tracking-widest mt-1">{birthDate ? getZodiacSign(birthDate) : 'Sync Vibe'}</p>
         </div>
         

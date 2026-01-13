@@ -84,11 +84,12 @@ interface CalendarWidgetProps {
   setEvents: (events: CalendarEvent[]) => void;
   selectedCountry: string;
   setSelectedCountry: (country: string) => void;
+  selectedDate: Date;
+  setSelectedDate: (d: Date) => void;
 }
 
-const CalendarWidget: React.FC<CalendarWidgetProps> = ({ events, setEvents, selectedCountry, setSelectedCountry }) => {
+const CalendarWidget: React.FC<CalendarWidgetProps> = ({ events, setEvents, selectedCountry, setSelectedCountry, selectedDate, setSelectedDate }) => {
   const [viewDate, setViewDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -374,7 +375,7 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ events, setEvents, sele
                 {editingEvent && (
                   <button type="button" onClick={() => { setEvents(events.filter(ev => ev.id !== editingEvent.id)); setIsModalOpen(false); }} className="px-6 py-5 bg-rose-500/20 border border-rose-500/30 rounded-2xl text-rose-300 font-black uppercase tracking-widest text-[9px] hover:bg-rose-500/30 transition-all">Delete</button>
                 )}
-                <button type="submit" className="flex-1 py-5 ios-btn rounded-2xl font-black uppercase tracking-[0.4em] text-xs shadow-xl active:scale-95 transition-all text-white bg-indigo-600">Save Event</button>
+                <button type="submit" className="flex-1 py-5 ios-glass hover:bg-white/10 active:scale-95 transition-all text-white font-black uppercase tracking-[0.4em] text-xs">Save Event</button>
               </div>
            </form>
         </div>
