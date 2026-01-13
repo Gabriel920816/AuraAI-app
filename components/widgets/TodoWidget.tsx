@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { TodoItem } from '../../types';
 
@@ -15,6 +16,12 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos, selectedDate }
   const selectedDateStr = useMemo(() => {
     return `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
   }, [selectedDate]);
+
+  const isSelectedDateToday = useMemo(() => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return selectedDateStr === todayStr;
+  }, [selectedDateStr]);
 
   const stats = useMemo(() => ({
     all: todos.filter(t => t.date === selectedDateStr).length,
@@ -73,7 +80,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, setTodos, selectedDate }
       <div className="px-6 py-4 border-b border-white/10 shrink-0 flex justify-between items-center">
         <div className="flex flex-col">
           <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Tasks</h3>
-          <span className="text-[8px] font-black opacity-30 mt-0.5">{selectedDateStr === new Date().toISOString().split('T')[0] ? 'TODAY' : selectedDateStr}</span>
+          <span className="text-[8px] font-black opacity-30 mt-0.5">{isSelectedDateToday ? 'TODAY' : selectedDateStr}</span>
         </div>
         <span className="text-[10px] font-black digital-number opacity-30">{stats.active} ACTIVE</span>
       </div>

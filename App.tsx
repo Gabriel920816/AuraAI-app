@@ -109,15 +109,18 @@ const App: React.FC = () => {
     }, 100);
   }, [processRollover, loadHoroscope]);
 
-  // 2. 跨天检查
+  // 2. 跨天检查 - 修正：增加 selectedDate 同步更新
   useEffect(() => {
     const midnightCheck = setInterval(() => {
-      const current = new Date().toDateString();
-      if (todayKey !== current) {
-        setTodayKey(current);
+      const now = new Date();
+      const currentKey = now.toDateString();
+      if (todayKey !== currentKey) {
+        console.log("Aura: A new day has arrived. Syncing UI...");
+        setTodayKey(currentKey);
+        setSelectedDate(now); // 關鍵：自動跳轉到新的一天
         setTodos(prev => processRollover(prev));
       }
-    }, 60000);
+    }, 30000); // 縮短檢查間隔到 30s 確保準時
     return () => clearInterval(midnightCheck);
   }, [todayKey, processRollover]);
 

@@ -20,15 +20,6 @@ const ZODIAC_META: Record<string, { color: string; path: string }> = {
   Pisces: { color: '#39CCCC', path: "M12 2c5 0 5 10 5 10s0 10-5 10-5-10-5-10 0-10 5-10z" },
 };
 
-const POPULAR_CITIES = [
-  { name: 'Sydney', country: 'AU', lat: -33.8688, lon: 151.2093, icon: 'fa-bridge' },
-  { name: 'Tokyo', country: 'JP', lat: 35.6895, lon: 139.6917, icon: 'fa-torii-gate' },
-  { name: 'London', country: 'UK', lat: 51.5074, lon: -0.1278, icon: 'fa-landmark' },
-  { name: 'New York', country: 'US', lat: 40.7128, lon: -74.0060, icon: 'fa-city' },
-  { name: 'Beijing', country: 'CN', lat: 39.9042, lon: 116.4074, icon: 'fa-archway' },
-  { name: 'Malaysia', country: 'MY', lat: 3.1390, lon: 101.6869, icon: 'fa-tower-broadcast' },
-];
-
 const ZodiacSVG = ({ sign, size = 24, glow = true }: { sign: string; size?: number, glow?: boolean }) => {
   const meta = ZODIAC_META[sign] || ZODIAC_META.Aries;
   return (
@@ -75,16 +66,11 @@ const GlassTripleDropdown = ({ value, onChange }: { value: string, onChange: (va
   const y = parts[0] ? parseInt(parts[0]) : 2000;
   const m = parts[1] ? parseInt(parts[1]) : 1;
   const d = parts[2] ? parseInt(parts[2]) : 1;
-  
   const years = Array.from({ length: 100 }, (_, i) => 2024 - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const daysInMonth = new Date(y, m, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  
-  const update = (ny = y, nm = m, nd = d) => { 
-    onChange(`${ny}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`); 
-  };
-
+  const update = (ny = y, nm = m, nd = d) => { onChange(`${ny}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`); };
   return (
     <div className="flex gap-2 w-full">
       <GlassSelect value={y} options={years} onChange={(val) => update(val, m, d)} label="Year" />
@@ -115,7 +101,6 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  
   const containerRef = useRef<HTMLDivElement>(null);
   const bgPickerRef = useRef<HTMLDivElement>(null);
 
@@ -130,10 +115,7 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.length < 2) {
-        setSearchResults([]);
-        return;
-      }
+      if (searchQuery.length < 2) { setSearchResults([]); return; }
       try {
         const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=en&format=json`);
         const data = await res.json();
@@ -143,145 +125,52 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  const useCurrentLocation = () => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        onSetLocation(pos.coords.latitude, pos.coords.longitude, 'Nearby');
-        setShowSearch(false);
-      },
-      (err) => console.error("Location access denied", err)
-    );
-  };
-
-  const weatherConfig = useMemo(() => {
-    const t = weatherData?.temp ?? 20;
-    const cond = weatherData?.condition || 'Clear';
-    const percent = Math.min(Math.max(((t + 10) / 50) * 100, 5), 100);
-    let thermalColor = '#FBBF24';
-    if (t > 30) thermalColor = '#FB923C';
-    else if (t < 15) thermalColor = '#7DD3FC';
-    return { thermalColor, percent, condition: cond, tColor: t > 30 ? 'text-orange-400' : (t < 15 ? 'text-sky-300' : 'text-amber-400') };
-  }, [weatherData]);
-
-  const BACKGROUND_OPTIONS = [
-    { name: 'Alpine Lake', url: 'https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=2560' },
-    { name: 'Snow Peak', url: 'https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=2560' },
-    { name: 'Cosmic Nebula', url: 'https://images.pexels.com/photos/2150/sky-space-dark-galaxy.jpg?auto=compress&cs=tinysrgb&w=2560' },
-    { name: 'Stormy Ocean', url: 'https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=2560' }
-  ];
-
   const handleFetchHoroscope = async (date: string, force = false) => {
     setIsSyncing(true);
     await onRefreshHoroscope(date, force);
     setIsSyncing(false);
   };
 
+  const isLimitReached = horoscope?.summary === "Limit Reached";
+
   return (
     <header className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 overflow-visible relative z-[500] h-14">
-      <div className="flex items-center gap-8 shrink-0 w-full lg:w-auto overflow-visible ml-0 lg:ml-10 transition-all duration-1000 ease-in-out">
+      <div className="flex items-center gap-8 shrink-0 w-full lg:w-auto overflow-visible ml-0 lg:ml-10">
         <div className="flex items-center select-none group cursor-default">
-          <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95 leading-none translate-y-[1px]">A</span>
-          <div className="relative w-[1.7rem] h-[1.7rem] thick-glass-orb rounded-full shrink-0 mr-[0.2em] overflow-visible">
+          <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95">A</span>
+          <div className="relative w-[1.7rem] h-[1.7rem] thick-glass-orb rounded-full shrink-0 mr-[0.2em]">
             <div className="w-[6px] h-[6px] bg-white rounded-full animate-aura-core z-20"></div>
             <div className="w-[6px] h-[6px] bg-white rounded-full animate-aura-halo z-10"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-[200%] h-full animate-orb-sheen pointer-events-none z-30 rounded-full"></div>
           </div>
-          <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95 leading-none translate-y-[1px]">RA</span>
+          <span className="text-[1.85rem] font-[100] tracking-[0.2em] text-white uppercase opacity-95">RA</span>
         </div>
-
-        <div className="hidden lg:block h-6 w-px bg-white/10 mx-2"></div>
-
-        <div className="flex gap-3 py-1 items-center overflow-visible">
-            <button onClick={() => setShowHealth(!showHealth)} className={`flex items-center gap-2 px-4 py-1.5 ios-glass transition-all shrink-0 h-10 ${showHealth ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 opacity-100' : 'opacity-60 hover:opacity-100'}`}>
+        <div className="flex gap-3 py-1 items-center">
+            <button onClick={() => setShowHealth(!showHealth)} className={`flex items-center gap-2 px-4 py-1.5 ios-glass h-10 ${showHealth ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' : 'opacity-60'}`}>
               <i className="fa-solid fa-droplet text-[10px]"></i>
-              <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">Health</span>
+              <span className="text-[9px] font-black uppercase hidden md:inline">Health</span>
             </button>
-            
-            <div className="relative shrink-0 overflow-visible" ref={bgPickerRef}>
-                <button onClick={() => setShowBgPicker(!showBgPicker)} className={`w-10 h-10 ios-glass flex items-center justify-center transition-all ${showBgPicker ? 'bg-white/20 border-white/40 text-white scale-105 opacity-100' : 'opacity-60 hover:opacity-100'}`}>
-                  <i className="fa-solid fa-palette text-[10px]"></i>
-                </button>
-                {showBgPicker && (
-                  <div className="absolute top-full left-0 mt-4 p-5 ios-glass z-[9999] w-72 shadow-2xl animate-in fade-in slide-in-from-top-2 border border-white/10">
-                    <h4 className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-3 px-1">Ambience Themes</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                        {BACKGROUND_OPTIONS.map((bg, i) => (
-                            <button key={i} onClick={() => { setBgImage(bg.url); setShowBgPicker(false); }} className="group relative h-24 rounded-2xl overflow-hidden border border-white/10 hover:border-white/50 transition-all bg-white/5">
-                                <img src={bg.url} alt={bg.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-[9px] font-black uppercase text-white tracking-widest">{bg.name}</span></div>
-                            </button>
-                        ))}
-                    </div>
-                  </div>
-                )}
-            </div>
+            <button onClick={() => setShowBgPicker(!showBgPicker)} className="w-10 h-10 ios-glass flex items-center justify-center opacity-60"><i className="fa-solid fa-palette text-[10px]"></i></button>
         </div>
       </div>
 
-      <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 top-0 h-full items-center justify-center z-[-1]">
-        <BigClock />
-      </div>
+      <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 top-0 h-full items-center justify-center z-[-1]"><BigClock /></div>
 
-      <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2.5 flex-1 w-full lg:auto overflow-visible pr-0 lg:pr-6">
+      <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2.5 flex-1 w-full lg:auto">
         <div className="ios-glass px-4 py-1.5 h-10 flex items-center shrink-0"><FocusWidget isCompact /></div>
         
-        <div className="relative overflow-visible" ref={containerRef}>
-          <div onClick={() => setShowSearch(!showSearch)} className="ios-glass px-3.5 py-1.5 h-10 flex items-center gap-2.5 cursor-pointer hover:bg-white/10 transition-all shrink-0">
-            <WeatherIcon condition={weatherConfig.condition} />
-            <div className="flex flex-col min-w-[2rem]">
-              <span className={`text-[1.1rem] font-black digital-number leading-none ${weatherConfig.tColor}`}>{weatherData?.temp ?? '--'}°</span>
-              <div className="w-full h-[2.5px] bg-white/10 rounded-full overflow-hidden mt-0.5"><div className="h-full transition-all duration-1000" style={{ width: `${weatherConfig.percent}%`, backgroundColor: weatherConfig.thermalColor }}></div></div>
-            </div>
-            <div className="h-4 w-px bg-white/10 mx-0.5"></div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase text-white/90 leading-none truncate max-w-[50px]">{weatherData?.condition}</span>
-              <span className="text-[7px] font-black opacity-30 uppercase tracking-widest mt-0.5 max-w-[50px] truncate">{weatherData?.location}</span>
-            </div>
-            <i className="fa-solid fa-magnifying-glass text-[9px] opacity-20 ml-1"></i>
-          </div>
-
-          {showSearch && (
-            <div className="absolute top-full right-0 mt-4 p-6 ios-glass z-[9999] w-80 animate-in fade-in zoom-in-95 duration-300 shadow-2xl border border-white/10">
-              <div className="flex gap-2 mb-6">
-                <div className="relative flex-1">
-                  <input autoFocus placeholder="Explore City..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-sm text-white outline-none focus:bg-white/10 focus:border-white/30 transition-all font-bold placeholder:text-white/20" />
-                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-[10px]"></i>
-                </div>
-                <button onClick={useCurrentLocation} className="w-12 h-12 ios-glass bg-white/5 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 border border-white/10 transition-all active:scale-95 shrink-0" title="Use Current Location"><i className="fa-solid fa-location-crosshairs text-sm"></i></button>
-              </div>
-              {searchQuery.length < 2 ? (
-                <div>
-                  <h5 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 mb-3 px-1 flex items-center gap-2"><i className="fa-solid fa-earth-americas opacity-40"></i>Popular Destinations</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {POPULAR_CITIES.map((city) => (
-                      <button key={city.name} onClick={() => { onSetLocation(city.lat, city.lon, city.name); setShowSearch(false); }} className="px-3 py-2 rounded-xl ios-glass bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/30 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 group"><i className={`fa-solid ${city.icon} opacity-40 group-hover:opacity-100 group-hover:text-indigo-400 transition-all`}></i>{city.name}</button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-hide px-1 animate-in fade-in duration-300">
-                  {searchResults.length > 0 ? searchResults.map((res, i) => (
-                    <button key={i} onClick={() => { onSetLocation(res.latitude, res.longitude, res.name); setShowSearch(false); setSearchQuery(''); }} className="w-full p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/30 text-left transition-all group flex items-center justify-between">
-                      <div><p className="text-[12px] font-black text-white group-hover:text-indigo-300 transition-colors">{res.name}</p><p className="text-[9px] opacity-30 uppercase tracking-widest mt-0.5">{res.country || res.country_code}</p></div><i className="fa-solid fa-location-dot text-[10px] text-indigo-400 opacity-0 group-hover:opacity-100 transition-all"></i>
-                    </button>
-                  )) : <div className="py-8 text-center opacity-20 flex flex-col items-center gap-2"><i className="fa-solid fa-circle-notch animate-spin text-xl"></i><p className="text-[10px] font-black uppercase tracking-widest">Searching...</p></div>}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div onClick={() => setIsModalOpen(true)} className="ios-glass px-4 py-1.5 h-10 flex items-center gap-3.5 cursor-pointer hover:bg-white/10 transition-all shrink-0 w-auto">
+        <div onClick={() => setIsModalOpen(true)} className={`ios-glass px-4 py-1.5 h-10 flex items-center gap-3.5 cursor-pointer hover:bg-white/10 transition-all ${isLimitReached ? 'border-amber-500/40' : ''}`}>
           {isSyncing ? (
             <div className="flex items-center gap-2 opacity-30"><div className="w-3 h-3 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div><span className="text-[10px] font-black uppercase tracking-widest">Updating...</span></div>
+          ) : isLimitReached ? (
+            <div className="flex items-center gap-2 text-amber-400"><i className="fa-solid fa-triangle-exclamation text-[10px]"></i><span className="text-[10px] font-black uppercase tracking-widest">Quota Full</span></div>
           ) : !horoscope ? (
-            <div className="flex items-center gap-2 text-white"><i className="fa-solid fa-sparkles text-[10px] text-white"></i><span className="text-[10px] font-black uppercase tracking-widest text-white">Horoscope</span></div>
+            <div className="flex items-center gap-2 text-white"><i className="fa-solid fa-sparkles text-[10px]"></i><span className="text-[10px] font-black uppercase tracking-widest">Horoscope</span></div>
           ) : (
             <>
-              <div className="translate-y-0.5"><ZodiacSVG sign={horoscope?.sign || 'Aries'} size={24} /></div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-black text-white leading-none tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[80px]">{horoscope?.summary || 'Stable'}</span>
-                <span className="text-[8px] font-black opacity-30 uppercase tracking-widest mt-0.5 whitespace-nowrap">{horoscope?.sign}</span>
+              <ZodiacSVG sign={horoscope?.sign || 'Aries'} size={24} />
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-white leading-none truncate max-w-[80px]">{horoscope?.summary}</span>
+                <span className="text-[8px] font-black opacity-30 uppercase">{horoscope?.sign}</span>
               </div>
             </>
           )}
@@ -289,59 +178,39 @@ const HeaderWidgets: React.FC<HeaderWidgetsProps> = ({
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[25px] animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}>
-          <div className="w-full max-w-[420px] p-8 md:p-10 rounded-[3.5rem] ios-glass border border-white/20 shadow-2xl flex flex-col gap-6 relative overflow-visible max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all z-10"><i className="fa-solid fa-xmark text-white/40 text-xs"></i></button>
-            {!horoscope ? (
-              <div className="py-6 flex flex-col items-center gap-6 text-center animate-in zoom-in-95 duration-500">
-                <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center border border-indigo-500/20"><i className="fa-solid fa-sparkles text-3xl text-indigo-400"></i></div>
-                <div>
-                  <h2 className="text-2xl font-black text-white tracking-tighter mb-2">Daily Horoscope</h2>
-                  <p className="text-[11px] text-white/40 leading-relaxed max-w-[240px] mx-auto">Select your birthday to get your horoscope for today.</p>
-                </div>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[25px] animate-in fade-in" onClick={() => setIsModalOpen(false)}>
+          <div className="w-full max-w-[420px] p-8 md:p-10 rounded-[3.5rem] ios-glass border border-white/20 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"><i className="fa-solid fa-xmark text-white/40 text-xs"></i></button>
+            
+            {isLimitReached && (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs font-bold leading-relaxed">
+                <i className="fa-solid fa-circle-info mr-2"></i>
+                Daily API quota exceeded. Free tier resets at 4:00 PM (Local). Aura is currently in battery-saving mode.
+              </div>
+            )}
+
+            {!horoscope || isLimitReached ? (
+              <div className="py-6 flex flex-col items-center gap-6 text-center">
+                <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center"><i className="fa-solid fa-sparkles text-3xl text-indigo-400"></i></div>
+                <h2 className="text-2xl font-black text-white tracking-tighter">Daily Horoscope</h2>
                 <div className="w-full"><GlassTripleDropdown value={birthDate} onChange={setBirthDate} /></div>
-                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); handleFetchHoroscope(birthDate); } }} className="w-full py-4 ios-glass hover:bg-white/10 active:scale-95 transition-all text-white flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.4em]">
-                  {isSyncing ? <><div className="w-3 h-3 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div><span>Loading...</span></> : "Show Horoscope"}
+                <button disabled={isSyncing} onClick={() => { if (birthDate) { localStorage.setItem('aura_birthdate', birthDate); handleFetchHoroscope(birthDate, true); } }} className="w-full py-4 ios-glass text-white text-[10px] font-black uppercase tracking-[0.4em]">
+                  {isSyncing ? "Syncing..." : "Update Insight"}
                 </button>
               </div>
             ) : (
-              <>
+              <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-5">
-                  <div className="w-24 h-24 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl shrink-0 relative"><div className="scale-110 translate-y-2"><ZodiacSVG sign={horoscope?.sign || 'Aries'} size={64} glow={true} /></div></div>
-                  <div className="flex-1 min-w-0"><h2 className="text-3xl font-black text-white tracking-tighter leading-none truncate">{horoscope?.sign}</h2><p className="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] mt-2">Today's Theme: <span className="text-white/80">{horoscope?.summary}</span></p></div>
+                  <div className="w-24 h-24 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center"><ZodiacSVG sign={horoscope?.sign || 'Aries'} size={64} /></div>
+                  <div className="flex-1"><h2 className="text-3xl font-black text-white tracking-tighter leading-none">{horoscope?.sign}</h2><p className="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] mt-2">Theme: {horoscope?.summary}</p></div>
                 </div>
-                <div className="space-y-3"><div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent"></div><p className="text-[13px] font-medium leading-snug text-white/90 italic tracking-tight py-1 min-h-[60px]">"{horoscope?.prediction}"</p></div>
-                
+                <p className="text-[13px] font-medium leading-snug text-white/90 italic tracking-tight italic">"{horoscope?.prediction}"</p>
                 <div className="p-5 rounded-[2rem] bg-white/10 border border-white/10 flex flex-wrap justify-between gap-x-4 gap-y-2">
                     {[{ label: 'Love', val: horoscope?.ratings.love }, { label: 'Work', val: horoscope?.ratings.work }, { label: 'Health', val: horoscope?.ratings.health }, { label: 'Wealth', val: horoscope?.ratings.wealth }].map(r => (
-                      <div key={r.label} className="flex justify-between items-center w-[45%]"><span className="text-[8px] font-black uppercase tracking-widest text-white/30">{r.label}</span><StarRating value={r.val || 0} /></div>
+                      <div key={r.label} className="flex justify-between items-center w-[45%]"><span className="text-[8px] font-black uppercase text-white/30">{r.label}</span><StarRating value={r.val || 0} /></div>
                     ))}
                 </div>
-
-                {horoscope.sources && horoscope.sources.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><i className="fa-solid fa-link"></i> Sources</h4>
-                    <div className="flex flex-col gap-2">
-                      {horoscope.sources.slice(0, 3).map((source, idx) => (
-                        <a key={idx} href={source.uri} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
-                          <span className="text-[10px] font-bold text-white/70 truncate pr-4 group-hover:text-indigo-300 transition-colors">{source.title}</span>
-                          <i className="fa-solid fa-arrow-up-right-from-square text-[8px] text-white/20 group-hover:text-white transition-all"></i>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-white/10 flex flex-col gap-5">
-                   <div className="flex justify-between items-center px-1">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Birthday Settings</span>
-                      <button disabled={isSyncing} onClick={() => handleFetchHoroscope(birthDate, true)} className="text-indigo-400 text-[9px] font-black uppercase hover:text-white transition-all flex items-center gap-2">
-                        {isSyncing && <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin"></div>}Refresh
-                      </button>
-                   </div>
-                   <div className="flex justify-center w-full"><GlassTripleDropdown value={birthDate} onChange={(val) => { setBirthDate(val); localStorage.setItem('aura_birthdate', val); }} /></div>
-                </div>
-              </>
+              </div>
             )}
           </div>
         </div>

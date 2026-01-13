@@ -5,37 +5,53 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
-// 全局请求锁：防止在同一时刻发起多个相同的请求
+// 全局請求鎖
 const requestLocks: Record<string, boolean> = {};
 
-const generateSeed = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+// 檢查是否處於「熔斷冷卻期」
+const checkCircuitBreaker = () => {
+  const blockedUntil = localStorage.getItem('aura_api_blocked_until');
+  if (blockedUntil) {
+    if (Date.now() < parseInt(blockedUntil)) {
+      console.warn("Aura: API is in cooling down period. Skipping request.");
+      return true;
+    } else {
+      localStorage.removeItem('aura_api_blocked_until');
+    }
   }
-  return Math.abs(hash);
+  return false;
+};
+
+// 設置熔斷：如果報錯，暫停請求 1 小時
+const setCircuitBreaker = () => {
+  const oneHour = 60 * 60 * 1000;
+  localStorage.setItem('aura_api_blocked_until', (Date.now() + oneHour).toString());
 };
 
 const cleanJSONResponse = (text: string): string => {
   return text.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
 };
 
-const fetchWithRetry = async (fn: () => Promise<any>, retries = 2, delay = 2000) => {
+const fetchWithRetry = async (fn: () => Promise<any>, retries = 1, delay = 5000) => {
+  if (checkCircuitBreaker()) {
+    throw new Error("API_QUOTA_COOLDOWN");
+  }
+
   try {
     return await fn();
   } catch (error: any) {
     const status = error?.status;
     const message = error?.message?.toLowerCase() || "";
     
-    // 如果是 429 (Too Many Requests) 或者包含 quota/limit 关键字
-    if (status === 429 || message.includes('quota') || message.includes('limit')) {
-      console.warn("Aura: API Quota reached. Cooling down...");
-      if (retries > 0) {
-        await new Promise(r => setTimeout(r, delay));
-        return fetchWithRetry(fn, retries - 1, delay * 2);
-      }
+    if (status === 429 || message.includes('quota') || message.includes('limit') || message.includes('exhausted')) {
+      console.error("Aura: Critical Quota Error. Triggering Circuit Breaker.");
+      setCircuitBreaker();
+      throw new Error("API_QUOTA_EXHAUSTED");
+    }
+    
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, delay));
+      return fetchWithRetry(fn, retries - 1, delay * 2);
     }
     throw error;
   }
@@ -62,33 +78,25 @@ export const getZodiacSign = (date: string) => {
 
 export const generateHoroscope = async (sign: string, birthDate: string, forceRefresh = false) => {
   const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `aura_horoscope_v8_${sign}_${today}`;
+  const cacheKey = `aura_horoscope_v9_${sign}_${today}`;
   const lockKey = `lock_${cacheKey}`;
 
-  // 1. 检查缓存
   const cached = localStorage.getItem(cacheKey);
   if (cached && !forceRefresh) return JSON.parse(cached);
-
-  // 2. 检查锁：如果当前已经在请求中，直接返回缓存或空
-  if (requestLocks[lockKey]) {
-    console.log("Aura: Request already in progress, skipping...");
-    return cached ? JSON.parse(cached) : null;
-  }
+  if (requestLocks[lockKey]) return cached ? JSON.parse(cached) : null;
 
   requestLocks[lockKey] = true;
   const ai = getAIClient();
-  const seed = generateSeed(`${sign}-${today}`);
 
   try {
     const response = await fetchWithRetry(async () => {
-      // 使用 Flash 模型以确保最高配额
       const res = await ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
-        contents: `Today is ${today}. Research daily horoscope for ${sign}. Return valid JSON.`,
+        contents: `Today is ${today}. Provide daily horoscope for ${sign}. Short & Insightful.`,
         config: {
-          tools: [{ googleSearch: {} }],
-          temperature: 0.1,
-          seed: seed,
+          // 減少搜尋頻率，這能顯著節省額度
+          tools: forceRefresh ? [{ googleSearch: {} }] : [], 
+          temperature: 0.7,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -117,19 +125,19 @@ export const generateHoroscope = async (sign: string, birthDate: string, forceRe
     
     localStorage.setItem(cacheKey, JSON.stringify(response));
     return response;
-  } catch (error) {
-    console.error("Horoscope Error:", error);
-    // 返回一个优雅的降级数据，不报错，防止组件循环触发
-    return { 
-      summary: "Rest", 
-      prediction: "The stars suggest a digital break. (API Daily Limit Reached). Check back later!", 
-      luckyNumber: "8", 
-      luckyColor: "Indigo", 
-      ratings: { love: 3, work: 3, health: 3, wealth: 3 }, 
-      sources: [] 
-    };
+  } catch (error: any) {
+    if (error.message === "API_QUOTA_EXHAUSTED" || error.message === "API_QUOTA_COOLDOWN") {
+      return { 
+        summary: "Limit Reached", 
+        prediction: "API Daily Limit Reached. Aura is resting to save energy. Reset happens at PT Midnight (16:00 Local).", 
+        luckyNumber: "--", 
+        luckyColor: "Gray", 
+        ratings: { love: 0, work: 0, health: 0, wealth: 0 }, 
+        sources: [] 
+      };
+    }
+    return null;
   } finally {
-    // 延迟释放锁，防止极短时间内的重试
     setTimeout(() => { delete requestLocks[lockKey]; }, 5000);
   }
 };
@@ -139,10 +147,11 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
   try {
     return await fetchWithRetry(async () => {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview', // 助手也全面使用 Flash 以节省配额
+        model: 'gemini-3-flash-preview',
         contents: `Assistant Context: ${JSON.stringify(currentContext)}. User Query: "${query}"`,
         config: {
-          tools: [{ googleSearch: {} }],
+          // 對於簡單問題，停用 googleSearch 以節省極為珍貴的 Pro/Flash 搜尋配額
+          tools: query.length > 15 ? [{ googleSearch: {} }] : [],
           temperature: 0.2,
           responseMimeType: "application/json",
           responseSchema: {
@@ -164,7 +173,7 @@ export const processAssistantQuery = async (query: string, currentContext: any) 
       });
       return JSON.parse(cleanJSONResponse(response.text || '{"reply": "Understood.", "action": {"type": "NONE"}}'));
     });
-  } catch (error) {
-    return { reply: "I'm currently resting due to high demand. Please try again in a moment!", action: { type: "NONE" } };
+  } catch (error: any) {
+    return { reply: "My API quota is currently full. Please try again after 16:00 (Local Time).", action: { type: "NONE" } };
   }
 };
