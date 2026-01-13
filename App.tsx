@@ -27,23 +27,26 @@ const App: React.FC = () => {
   });
 
   const isHoroscopeLoading = useRef(false);
+  const isInitialLoad = useRef(true); // 增加初始加载标记，防止空状态覆盖本地存储
 
   const getTodayStr = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   };
 
-  const rolloverTasks = useCallback((currentTodos: TodoItem[]) => {
+  // 修改为纯函数，返回处理后的数组
+  const processRollover = useCallback((items: TodoItem[]) => {
     const todayStr = getTodayStr();
-    let hasChanges = false;
-    const updatedTodos = currentTodos.map(todo => {
+    return items.map(todo => {
       if (!todo.completed && todo.date < todayStr) {
-        hasChanges = true;
-        return { ...todo, date: todayStr, originalDate: todo.originalDate || todo.date };
+        return { 
+          ...todo, 
+          date: todayStr, 
+          originalDate: todo.originalDate || todo.date 
+        };
       }
       return todo;
     });
-    if (hasChanges) setTodos(updatedTodos);
   }, []);
 
   const updateWeather = async (lat: number, lon: number, locationName: string) => {
@@ -62,8 +65,6 @@ const App: React.FC = () => {
 
   const loadHoroscope = useCallback(async (birthDate: string, force = false) => {
     if (!birthDate || isHoroscopeLoading.current) return;
-    
-    // 即使缓存没有，也要防止并发
     isHoroscopeLoading.current = true;
     const sign = getZodiacSign(birthDate);
     const data = await generateHoroscope(sign, birthDate, force);
@@ -71,17 +72,26 @@ const App: React.FC = () => {
     isHoroscopeLoading.current = false;
   }, []);
 
+  // 1. 核心初始化 useEffect
   useEffect(() => {
     const savedEvents = localStorage.getItem('aura_events');
     if (savedEvents) setEvents(JSON.parse(savedEvents));
+
     const savedTodos = localStorage.getItem('aura_todos');
-    if (savedTodos) rolloverTasks(JSON.parse(savedTodos));
+    if (savedTodos) {
+      const parsed = JSON.parse(savedTodos);
+      setTodos(processRollover(parsed)); // 直接更新，不再依赖 hasChanges 判断
+    }
+
     const savedPeriods = localStorage.getItem('aura_periods');
     if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
+    
     const savedHealthPref = localStorage.getItem('aura_show_health');
     if (savedHealthPref !== null) setShowHealth(JSON.parse(savedHealthPref));
+    
     const savedCountry = localStorage.getItem('aura_selected_country');
     if (savedCountry) setSelectedCountry(savedCountry);
+    
     const savedBg = localStorage.getItem('aura_bg');
     if (savedBg) setBgImage(savedBg);
 
@@ -92,11 +102,38 @@ const App: React.FC = () => {
       (pos) => updateWeather(pos.coords.latitude, pos.coords.longitude, 'Nearby'),
       () => updateWeather(-33.8688, 151.2093, 'Sydney')
     );
-  }, [rolloverTasks, loadHoroscope]);
 
-  useEffect(() => { localStorage.setItem('aura_events', JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem('aura_todos', JSON.stringify(todos)); }, [todos]);
-  useEffect(() => { localStorage.setItem('aura_periods', JSON.stringify(periods)); }, [periods]);
+    // 标记初始加载完成
+    setTimeout(() => {
+      isInitialLoad.current = false;
+    }, 100);
+  }, [processRollover, loadHoroscope]);
+
+  // 2. 跨天检查
+  useEffect(() => {
+    const midnightCheck = setInterval(() => {
+      const current = new Date().toDateString();
+      if (todayKey !== current) {
+        setTodayKey(current);
+        setTodos(prev => processRollover(prev));
+      }
+    }, 60000);
+    return () => clearInterval(midnightCheck);
+  }, [todayKey, processRollover]);
+
+  // 3. 持久化存储 useEffect (增加 isInitialLoad 保护)
+  useEffect(() => { 
+    if (!isInitialLoad.current) localStorage.setItem('aura_events', JSON.stringify(events)); 
+  }, [events]);
+  
+  useEffect(() => { 
+    if (!isInitialLoad.current) localStorage.setItem('aura_todos', JSON.stringify(todos)); 
+  }, [todos]);
+  
+  useEffect(() => { 
+    if (!isInitialLoad.current) localStorage.setItem('aura_periods', JSON.stringify(periods)); 
+  }, [periods]);
+
   useEffect(() => { localStorage.setItem('aura_show_health', JSON.stringify(showHealth)); }, [showHealth]);
   useEffect(() => { localStorage.setItem('aura_selected_country', selectedCountry); }, [selectedCountry]);
   useEffect(() => { localStorage.setItem('aura_bg', bgImage); }, [bgImage]);
